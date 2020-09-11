@@ -80,10 +80,25 @@ namespace QRs
 
         float yaw = 500, pitch = 500, roll = 500;
         FileStream fs;
+        FileStream fs_matrix;
         bool Write = false;
 
         public Form1()
         {
+            //matrixA = new Matrix3x3()
+            //{
+            //    V00 = 0.0F,
+            //    V01 = 0.0F,
+            //    V02 = 0.0F,
+            //    V10 = 0.0F,
+            //    V11 = 0.0F,
+            //    V12 = 0.0F,
+            //    V20 = 0.0F,
+            //    V21 = 0.0F,
+            //    V22 = 0.0F
+            //};
+
+
             InitializeComponent();
             glyphsImageList.ImageSize = new Size(32, 32);
             glyphList.LargeImageList = glyphsImageList;
@@ -241,10 +256,10 @@ namespace QRs
 
                         points = new AForge.Point[]
                         {
-                            new AForge.Point() { X = pointA.Y, Y = -pointA.X },
-                            new AForge.Point() { X = pointB.Y, Y = -pointB.X },
-                            new AForge.Point() { X = pointC.Y, Y = -pointC.X },
-                            new AForge.Point() { X = pointD.Y, Y = -pointD.X }
+                            new AForge.Point() { X = pointA.X, Y = pointA.Y },
+                            new AForge.Point() { X = pointB.X, Y = pointB.Y },
+                            new AForge.Point() { X = pointC.X, Y = pointC.Y },
+                            new AForge.Point() { X = pointD.X, Y = pointD.Y }
                         };
                         Pen pen = new Pen(Color.Green, 3);
                         IntPoint[] temp = new IntPoint[] {
@@ -280,6 +295,10 @@ namespace QRs
         Vector3 translationVector = new Vector3();
         Vector3 bestTranslationVector = new Vector3();
         Vector3 alternateTranslationVector = new Vector3();
+
+
+
+
         private void EstimatePose(AForge.Point[] inputPoints)
         {
             try
@@ -324,14 +343,14 @@ namespace QRs
                     if (!useCoplanarPosit)
                     {
                         Posit posit = new Posit(modelPoints, focalLength);
-                        posit.EstimatePose(points, out rotationMatrix, out translationVector);
+                        posit.EstimatePose(inputPoints, out rotationMatrix, out translationVector);
 
                         //bestPoseButton.Visible = alternatePoseButton.Visible = false;
                     }
                     else
                     {
                         CoplanarPosit coposit = new CoplanarPosit(modelPoints, focalLength);
-                        coposit.EstimatePose(points, out rotationMatrix, out translationVector);
+                        coposit.EstimatePose(inputPoints, out rotationMatrix, out translationVector);
 
                         bestRotationMatrix = coposit.BestEstimatedRotation;
                         bestTranslationVector = coposit.BestEstimatedTranslation;
@@ -351,14 +370,25 @@ namespace QRs
                         else
                             rotationMatrix = rotationMatrix * matrix;
                     }
+
                     rotationMatrix = rotationMatrix.Transpose();
                     estimatedPitch = (float)Math.Asin(-rotationMatrix.V02);
                     estimatedYaw = (float)Math.Atan2(rotationMatrix.V01, rotationMatrix.V00);
                     estimatedRoll = (float)Math.Atan2(rotationMatrix.V12, rotationMatrix.V22);
-                    yaw = estimatedYaw = Convert.ToSingle(KAYaw.Output(estimatedYaw * (float)(180.0 / Math.PI)));
-                    pitch = estimatedPitch = Convert.ToSingle(KAPitch.Output(estimatedPitch * (float)(180.0 / Math.PI)));
-                    roll = estimatedRoll = Convert.ToSingle(KARoll.Output(estimatedRoll * (float)(180.0 / Math.PI)));
 
+                    if (checkBox1.Checked)
+                    {
+                        yaw = estimatedYaw = Convert.ToSingle(KAYaw.Output(estimatedYaw * (float)(180.0 / Math.PI)));
+                        pitch = estimatedPitch = Convert.ToSingle(KAPitch.Output(estimatedPitch * (float)(180.0 / Math.PI)));
+                        roll = estimatedRoll = Convert.ToSingle(KARoll.Output(estimatedRoll * (float)(180.0 / Math.PI)));
+
+                    }
+                    else
+                    {
+                        yaw = estimatedYaw = Convert.ToSingle(estimatedYaw * (float)(180.0 / Math.PI));
+                        pitch = estimatedPitch = Convert.ToSingle(estimatedPitch * (float)(180.0 / Math.PI));
+                        roll = estimatedRoll = Convert.ToSingle(estimatedRoll * (float)(180.0 / Math.PI));
+                    }
 
                     // TO DOO
                     label1.Text = string.Format("A :: Rotation: (yaw(Z)={0}, pitch(y)={1}, roll(X)={2})",
@@ -367,6 +397,9 @@ namespace QRs
                     estimatedTransformationMatrixControl1.SetMatrix(
                                                               Matrix4x4.CreateTranslation(translationVector) *
                                                              Matrix4x4.CreateFromRotation(rotationMatrix));
+
+
+
                 }
             }
             catch (Exception)
@@ -560,15 +593,29 @@ namespace QRs
         private void Form1_Load(object sender, EventArgs e)
         {
             // estimatedTransformationMatrixControl1 = new QRs.Controls.MatrixControl();
-            double A = 1;
-            double H = 1;
-            double Q = 0.900;//noise
-            double R = 100;
-            double P = 0.1;
-            double x = 0;
-            KARoll = new KalmanFilter(A, H, Q, R, P, x);
-            KAPitch = new KalmanFilter(A, H, Q, R, P, x);
-            KAYaw = new KalmanFilter(A, H, Q, R, P, x);
+            double rA = 1;
+            double rH = 1;
+            double rQ = 0.990;//noise
+            double rR = 300;
+            double rP = 0.1;
+            double rx = 0;
+            KARoll = new KalmanFilter(rA, rH, rQ, rR, rP, rx);
+
+            double pA = 1;
+            double pH = 1;
+            double pQ = 0.990;//noise
+            double pR = 300;
+            double pP = 0.1;
+            double px = 0;
+            KAPitch = new KalmanFilter(pA, pH, pQ, pR, pP, px);
+
+            double yA = 1;
+            double yH = 1;
+            double yQ = 0.900;//noise
+            double yR = 100;
+            double yP = 0.1;
+            double yx = 0;
+            KAYaw = new KalmanFilter(yA, yH, yQ, yR, yP, yx);
 
             estimatedTransformationMatrixControl1.Clear();
             // load configuratio
@@ -625,10 +672,10 @@ namespace QRs
                     //new Vector3() { X = 73.0F, Y = 73.0F  ,Z =0},
                     //new Vector3() { X = -73.0F,Y = 73.0F  ,Z =0}
 
-                    new Vector3() { X =-176.5F, Y =+176.5F  ,Z =0},
                     new Vector3() { X =-176.5F, Y =-176.5F  ,Z =0},
                     new Vector3() { X =+176.5F, Y =-176.5F  ,Z =0},
-                    new Vector3() { X =+176.5F, Y =+176.5F  ,Z =0}
+                    new Vector3() { X =+176.5F, Y =+176.5F  ,Z =0},
+                    new Vector3() { X =-176.5F, Y =+176.5F  ,Z =0}
 
 
 
@@ -795,18 +842,18 @@ namespace QRs
             catch (Exception)
             {
 
-                matrixA = new Matrix3x3()
-                {
-                    V00 = 0,
-                    V01 = 0,
-                    V02 = 0,
-                    V10 = 0,
-                    V11 = 0,
-                    V12 = 0,
-                    V20 = 0,
-                    V21 = 0,
-                    V22 = 0
-                };
+                //matrixA = new Matrix3x3()
+                //{
+                //    V00 = 0.0F,
+                //    V01 = 0.0F,
+                //    V02 = 0.0F,
+                //    V10 = 0.0F,
+                //    V11 = 0.0F,
+                //    V12 = 0.0F,
+                //    V20 = 0.0F,
+                //    V21 = 0.0F,
+                //    V22 = 0.0F
+                //};
             }
         }
 
@@ -871,9 +918,9 @@ namespace QRs
 
 
             if (roll != 500) graph(rollChart, "A Roll", roll, Color.Blue); else graph(rollChart, "A Roll", LastRoll, Color.Blue); ;
-            if (pitch != 500) graph(pitchChart, "A Pich", pitch, Color.Blue); else graph(pitchChart, "A Pich", LastPitch, Color.Blue); 
-            if (yaw != 500) graph(yawChart, "A Yaw", yaw, Color.Blue); else graph(yawChart, "A Yaw", LastYaw, Color.Blue); 
-            
+            if (pitch != 500) graph(pitchChart, "A Pich", pitch, Color.Blue); else graph(pitchChart, "A Pich", LastPitch, Color.Blue);
+            if (yaw != 500) graph(yawChart, "A Yaw", yaw, Color.Blue); else graph(yawChart, "A Yaw", LastYaw, Color.Blue);
+
 
 
 
@@ -891,7 +938,7 @@ namespace QRs
         {
             if (c.Series[0].Points.Count == 0)
             {
-                c.Series[0].Points.AddXY(0,0) ;
+                c.Series[0].Points.AddXY(0, 0);
             }
             Series ser = new Series(name);
             ser.ChartType = SeriesChartType.Line;
@@ -910,7 +957,7 @@ namespace QRs
             ser.Color = clr;
             c.Series.Add(ser);
             c.ChartAreas[0].RecalculateAxesScale();
-            
+
         }
 
         private void button1_Click(object sender, EventArgs e)
@@ -996,5 +1043,97 @@ namespace QRs
                 textBox.Text = string.Empty;
             }
         }
+
+
+
+        private void Form1_FormClosing(object sender, FormClosingEventArgs e)
+        {
+            //
+            if (fs != null)
+                fs.Close();
+            Configuration config = Configuration.Instance;
+
+            if (WindowState != FormWindowState.Minimized)
+            {
+                if (WindowState != FormWindowState.Maximized)
+                {
+                    config.SetConfigurationOption(mainFormXOption, Location.X.ToString());
+                    config.SetConfigurationOption(mainFormYOption, Location.Y.ToString());
+                    config.SetConfigurationOption(mainFormWidthOption, Width.ToString());
+                    config.SetConfigurationOption(mainFormHeightOption, Height.ToString());
+                }
+                config.SetConfigurationOption(mainFormStateOption, WindowState.ToString());
+                config.SetConfigurationOption(mainSplitterOption, splitContainer1.SplitterDistance.ToString());
+            }
+
+            config.SetConfigurationOption(activeDatabaseOption, activeGlyphDatabaseName);
+
+            config.SetConfigurationOption(autoDetectFocalLengthOption, autoDetectFocalLength.ToString());
+            config.SetConfigurationOption(focalLengthOption, imageProcessor.CameraFocalLength.ToString());
+            config.SetConfigurationOption(glyphSizeOption, imageProcessor.GlyphSize.ToString());
+
+            try
+            {
+                config.Save(glyphDatabases);
+            }
+            catch (IOException ex)
+            {
+                ShowErrorBox("Failed saving confguration file.\r\n\r\n" + ex.Message);
+            }
+
+            if (videoSourcePlayer.VideoSource != null)
+            {
+                videoSourcePlayer.SignalToStop();
+                videoSourcePlayer.WaitForStop();
+            }
+            //
+
+        }
+
+        private void button4_Click(object sender, EventArgs e)
+        {
+            var mtrx1 = estimatedTransformationMatrixControl1.GetMatricx();
+     
+                fs_matrix = File.Create("matrix.txt");
+            
+            byte[] title = new UTF8Encoding(true).GetBytes(string.Format("{0},{1},{2},{3},{4},{5},{6},{7},{8}",
+            mtrx1.V00,
+            mtrx1.V01,
+            mtrx1.V02,
+            mtrx1.V10,
+            mtrx1.V11,
+            mtrx1.V12,
+            mtrx1.V20,
+            mtrx1.V21,
+            mtrx1.V22));
+            fs_matrix.Write(title, 0, title.Length);
+            fs_matrix.Close();
+        }
+
+        private void button6_Click(object sender, EventArgs e)
+        {
+            if(File.Exists("matrix.txt"))
+            {
+                string smatrix = File.ReadAllText("matrix.txt");
+                var cels = smatrix.Split(',');
+                
+                matrixA = new Matrix3x3()
+                {
+                 V00 =float.Parse(cels[0]),
+                 V01 =float.Parse(cels[1]),
+                 V02 =float.Parse(cels[2]),
+                 V10 =float.Parse(cels[3]),
+                 V11 =float.Parse(cels[4]),
+                 V12 =float.Parse(cels[5]),
+                 V20 =float.Parse(cels[6]),
+                 V21 =float.Parse(cels[7]),
+                 V22 =float.Parse(cels[8])
+                 };
+            }
+        }
+
+
+
+
     }
 }
